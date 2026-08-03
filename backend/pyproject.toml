@@ -1,0 +1,34 @@
+[build-system]
+requires = ["hatchling>=1.28,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "drexel-schedule-generator"
+version = "0.1.0"
+description = "Backend for the Drexel Schedule Generator"
+readme = "../README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic==1.18.5",
+    "beautifulsoup4==4.15.0",
+    "fastapi==0.141.1",
+    "pydantic==2.13.4",
+    "playwright==1.62.0",
+    "psycopg[binary]==3.2.10",
+    "sqlalchemy==2.0.51",
+    "uvicorn[standard]==0.52.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx2==2.9.1",
+    "pytest==9.1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/drexel_schedule_generator"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+cache_dir = ".test-cache"

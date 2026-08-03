@@ -1,0 +1,27 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+.private/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/*.local
+
+# Backend
+backend/.venv/
+backend/.pytest_cache/
+backend/.test-cache/
+backend/.coverage
+backend/htmlcov/
+backend/**/*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
