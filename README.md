@@ -110,13 +110,15 @@ docker compose config
 - `GET /api/v1/data-freshness`
 - `POST /api/v1/schedules/generate`
 
+Course-search items include `has_saturday_sections`, derived from active recurring meeting data. The frontend uses it to expose Saturday filtering only when at least one selected course can meet on Saturday.
+
 ## Current limitations
 
 - Undergraduate courses only
 - Saved sanitized fixtures or explicit synthetic demo data; no automatic live updates
 - No accounts, notifications, ratings, AI, deployment, or background updater
 - No authoritative component compatibility mapping in the current source sample
-- Sections without at least one usable timed meeting are excluded
+- Sections without a usable timed meeting or an explicit asynchronous meeting are excluded
 - Schedule generation accepts up to eight courses and returns every distinct meeting-time combination found before the 100,000-step exploration guard
 - Same-course sections with identical component and recurring meeting patterns are consolidated before generation
 - Image and PDF exports capture the styled timetable; Outlook calendar export uses ICS

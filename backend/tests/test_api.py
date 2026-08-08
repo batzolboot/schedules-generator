@@ -2,9 +2,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from drexel_schedule_generator.api.dependencies import get_session
+from drexel_schedule_generator.db.models import MeetingDay, MeetingTime
 from drexel_schedule_generator.main import app
 from drexel_schedule_generator.webtms.importer import import_dataset
 from drexel_schedule_generator.webtms.parser import parse_fixture_directory
@@ -32,6 +34,16 @@ def test_discovery_and_generation_flow(db_session: Session) -> None:
         assert courses.json()["total"] == 1
         course = courses.json()["items"][0]
         assert course["component_types"] == ["lab", "lecture"]
+        assert course["has_saturday_sections"] is False
+
+        meeting = db_session.scalar(select(MeetingTime).limit(1))
+        assert meeting is not None
+        meeting.days.append(MeetingDay(day_of_week=6))
+        db_session.flush()
+        saturday_course = client.get(
+            f"/api/v1/terms/{summary.term_id}/courses", params={"search": "CS 172"}
+        ).json()["items"][0]
+        assert saturday_course["has_saturday_sections"] is True
 
         sections = client.get(f"/api/v1/terms/{summary.term_id}/courses/{course['id']}/sections")
         assert sections.status_code == 200

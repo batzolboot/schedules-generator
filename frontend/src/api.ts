@@ -18,6 +18,7 @@ export interface Course {
   schedulable_section_count: number
   component_types: string[]
   delivery_modes?: Array<'online' | 'face_to_face'>
+  has_saturday_sections: boolean
 }
 
 export interface Meeting {

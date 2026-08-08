@@ -24,6 +24,7 @@ class CourseResponse(BaseModel):
     schedulable_section_count: int
     component_types: list[str]
     delivery_modes: list[str]
+    has_saturday_sections: bool
 
 
 class CoursePageResponse(BaseModel):

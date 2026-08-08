@@ -53,9 +53,9 @@ export function filterSchedules(schedules: Schedule[], filters: ScheduleFilters)
   )
 }
 
-export function filtersAreDefault(filters: ScheduleFilters): boolean {
-  return filters.allowedDays.length === FILTER_DAYS.length
-    && FILTER_DAYS.every((day) => filters.allowedDays.includes(day))
+export function filtersAreDefault(filters: ScheduleFilters, filterDays: readonly number[] = FILTER_DAYS): boolean {
+  return filters.allowedDays.length === filterDays.length
+    && filterDays.every((day) => filters.allowedDays.includes(day))
     && filters.earliestStartMinutes === DEFAULT_EARLIEST_START
     && filters.latestEndMinutes === DEFAULT_LATEST_END
 }
@@ -68,10 +68,10 @@ export function clampEndMinutes(requested: number, startMinutes: number): number
   return Math.max(requested, startMinutes + MINIMUM_RANGE_MINUTES)
 }
 
-export function describeActiveFilters(filters: ScheduleFilters, dayNames: string[], formatMinutes: (value: number) => string): string[] {
-  const selectedDays = FILTER_DAYS.filter((day) => filters.allowedDays.includes(day))
-  const dayDescription = selectedDays.length === FILTER_DAYS.length
-    ? 'Monday–Saturday'
+export function describeActiveFilters(filters: ScheduleFilters, dayNames: string[], formatMinutes: (value: number) => string, filterDays: readonly number[] = FILTER_DAYS): string[] {
+  const selectedDays = filterDays.filter((day) => filters.allowedDays.includes(day))
+  const dayDescription = selectedDays.length === filterDays.length
+    ? filterDays.includes(6) ? 'Monday–Saturday' : 'Monday–Friday'
     : selectedDays.length
       ? selectedDays.map((day) => dayNames[day - 1]).join(', ')
       : 'No weekdays selected'

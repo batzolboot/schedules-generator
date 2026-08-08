@@ -15,7 +15,7 @@ vi.mock('./api', () => ({
 }))
 
 const term = { id: 1, source_code: '202545', name: 'Summer Quarter 25-26', active: true, latest_successful_import_at: '2026-08-02T20:00:00Z' }
-const course: Course = { id: 10, subject: 'CS', number: '172', title: 'Computer Programming II', minimum_credits: '3.00', maximum_credits: '3.00', schedulable_section_count: 2, component_types: ['lecture', 'lab'], delivery_modes: ['face_to_face'] }
+const course: Course = { id: 10, subject: 'CS', number: '172', title: 'Computer Programming II', minimum_credits: '3.00', maximum_credits: '3.00', schedulable_section_count: 2, component_types: ['lecture', 'lab'], delivery_modes: ['face_to_face'], has_saturday_sections: false }
 const section = (id: number, component: string, day: number) => ({ id, subject: 'CS', course_number: '172', crn: String(40000 + id), section_number: String(id), component, instructors: [], campus: 'University City', instructional_method: 'Face-To-Face', maximum_enrollment: null, meetings: [{ days: [day], start_time: '09:00:00', end_time: '10:00:00', start_date: '2026-06-22', end_date: '2026-08-29', meeting_type: 'class', is_asynchronous: false, is_arranged: false }] })
 
 beforeEach(() => {

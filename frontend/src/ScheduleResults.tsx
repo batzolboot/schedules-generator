@@ -122,7 +122,7 @@ function ScheduleGallery({ groups, courseStyles, selected, gapOrder, onToggle, o
   return <section className="schedule-gallery" aria-labelledby="gallery-heading"><div className="gallery-heading"><p className="eyebrow" id="gallery-heading">Schedule gallery</p><div><button type="button" onClick={onToggleGap}>Gap time: {gapOrder === 'ascending' ? 'lowest to highest' : 'highest to lowest'}</button><span>Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, groups.length)} of {groups.length}</span></div></div><div className="page-size-controls" aria-label="Schedules per page"><span>Show</span>{([20, 50, 100, 'all'] as const).map((choice) => <button type="button" aria-pressed={pageSizeChoice === choice} key={choice} onClick={() => choosePageSize(choice)}>{choice === 'all' ? 'All' : choice}</button>)}</div><div className="schedule-card-grid">{pageGroups.map(({ schedule }, offset) => { const index = page * pageSize + offset; const hasOnline = schedule.sections.some(isOnlineSection); return <article className="schedule-card" key={index}><div className="schedule-card-heading"><strong>Schedule {index + 1}</strong><label><input type="checkbox" checked={selected.includes(index)} disabled={!selected.includes(index) && selected.length >= 6} onChange={() => onToggle(index)} /> Compare</label></div><MiniTimetable schedule={schedule} courseStyles={courseStyles} /><dl><div><dt>Gaps</dt><dd>{schedule.metrics.total_gap_minutes} min</dd></div><div><dt>Online class</dt><dd>{hasOnline ? 'Yes' : 'No'}</dd></div><div><dt>Starts</dt><dd>{displayTime(schedule.metrics.earliest_start)}</dd></div><div><dt>Ends</dt><dd>{displayTime(schedule.metrics.latest_end)}</dd></div></dl><button type="button" onClick={() => onOpen(index)}>View full schedule</button></article> })}</div>{pageCount > 1 && <div className="gallery-pagination"><button type="button" disabled={page === 0} onClick={() => setPage((value) => value - 1)}>Previous page</button><span>Page {page + 1} of {pageCount}</span><button type="button" disabled={page === pageCount - 1} onClick={() => setPage((value) => value + 1)}>Next page</button></div>}</section>
 }
 
-function FilterPanel({ filters, onChange, onReset }: { filters: ScheduleFilters; onChange: (filters: ScheduleFilters) => void; onReset: () => void }) {
+function FilterPanel({ filters, filterDays, onChange, onReset }: { filters: ScheduleFilters; filterDays: readonly number[]; onChange: (filters: ScheduleFilters) => void; onReset: () => void }) {
   const toggleDay = (day: number) => onChange({ ...filters, allowedDays: filters.allowedDays.includes(day) ? filters.allowedDays.filter((value) => value !== day) : [...filters.allowedDays, day].sort((a, b) => a - b) })
   const adjustRangeWithKeyboard = (event: KeyboardEvent<HTMLInputElement>, handle: 'start' | 'end') => {
     const direction = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 0
@@ -141,8 +141,8 @@ function FilterPanel({ filters, onChange, onReset }: { filters: ScheduleFilters;
   const timeTicks = [TIME_RANGE_MIN, 540, 660, 780, 900, 1020, 1140, 1260, TIME_RANGE_MAX]
   return (
     <aside className="filter-panel" aria-labelledby="filter-heading">
-      <div className="filter-heading-row"><div><p className="eyebrow">Generated results</p><h3 id="filter-heading">Filter schedules</h3></div><button type="button" onClick={onReset} disabled={filtersAreDefault(filters)}>Reset filters</button></div>
-      <fieldset aria-label="Allowed days"><div className="day-checkboxes">{FILTER_DAYS.map((day) => <label key={day}><input type="checkbox" checked={filters.allowedDays.includes(day)} onChange={() => toggleDay(day)} />{DAY_NAMES[day - 1]}</label>)}</div></fieldset>
+      <div className="filter-heading-row"><div><p className="eyebrow">Generated results</p><h3 id="filter-heading">Filter schedules</h3></div><button type="button" onClick={onReset} disabled={filtersAreDefault(filters, filterDays)}>Reset filters</button></div>
+      <fieldset aria-label="Allowed days"><div className="day-checkboxes">{filterDays.map((day) => <label key={day}><input type="checkbox" checked={filters.allowedDays.includes(day)} onChange={() => toggleDay(day)} />{DAY_NAMES[day - 1]}</label>)}</div></fieldset>
       <fieldset className="time-range-fieldset" aria-label="Allowed class time">
         <p className="selected-time-range" aria-live="polite"><strong>{minutesToTime(filters.earliestStartMinutes)} – {minutesToTime(filters.latestEndMinutes)}</strong></p>
         <div className="range-scale" aria-hidden="true"><div>{timeTicks.map((minute) => <span className={minute === TIME_RANGE_MIN ? 'scale-start' : minute === TIME_RANGE_MAX ? 'scale-end' : ''} key={minute} style={{ left: `${((minute - TIME_RANGE_MIN) / (TIME_RANGE_MAX - TIME_RANGE_MIN)) * 100}%` }}>{minutesToTime(minute).replace(':00', '')}</span>)}</div></div>
@@ -154,13 +154,16 @@ function FilterPanel({ filters, onChange, onReset }: { filters: ScheduleFilters;
           <input id="latest-class-end" className="range-input range-end" type="range" min={TIME_RANGE_MIN} max={TIME_RANGE_MAX} step={TIME_STEP_MINUTES} value={filters.latestEndMinutes} aria-label="Latest allowed class end time" aria-valuetext={minutesToTime(filters.latestEndMinutes)} onInput={(event) => onChange({ ...filters, latestEndMinutes: clampEndMinutes(Number(event.currentTarget.value), filters.earliestStartMinutes) })} onKeyDown={(event) => adjustRangeWithKeyboard(event, 'end')} />
         </div>
       </fieldset>
-      <p className="filter-constraint-summary"><strong>Current filters:</strong> {describeActiveFilters(filters, DAY_NAMES, minutesToTime).join(' · ')}</p>
+      <p className="filter-constraint-summary"><strong>Current filters:</strong> {describeActiveFilters(filters, DAY_NAMES, minutesToTime, filterDays).join(' · ')}</p>
     </aside>
   )
 }
 
 export function ScheduleResults({ generation, selectedCourses }: { generation: GenerateResponse; selectedCourses: Course[] }) {
-  const [filters, setFilters] = useState<ScheduleFilters>(DEFAULT_FILTERS)
+  const supportsSaturday = selectedCourses.some((course) => course.has_saturday_sections)
+  const filterDays = supportsSaturday ? FILTER_DAYS : WEEKDAYS
+  const defaultFilters = useMemo<ScheduleFilters>(() => ({ ...DEFAULT_FILTERS, allowedDays: [...filterDays] }), [filterDays])
+  const [filters, setFilters] = useState<ScheduleFilters>(() => defaultFilters)
   const [scheduleIndex, setScheduleIndex] = useState(0)
   const [exporting, setExporting] = useState<'image' | 'pdf' | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
@@ -168,11 +171,17 @@ export function ScheduleResults({ generation, selectedCourses }: { generation: G
   const [comparisonIndices, setComparisonIndices] = useState<number[]>([])
   const [gapOrder, setGapOrder] = useState<'ascending' | 'descending'>('ascending')
   const scheduleCaptureRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    setFilters(defaultFilters)
+    setScheduleIndex(0)
+    setComparisonIndices([])
+    setViewMode('gallery')
+  }, [defaultFilters])
   const consolidatedSchedules = useMemo(() => consolidateEquivalentSchedules(generation.schedules), [generation.schedules])
   const filteredSchedules = useMemo(() => consolidatedSchedules.filter(({ schedule }) => filterSchedules([schedule], filters).length > 0).sort((left, right) => { const difference = left.schedule.metrics.total_gap_minutes - right.schedule.metrics.total_gap_minutes; return gapOrder === 'ascending' ? difference : -difference }), [consolidatedSchedules, filters, gapOrder])
   const currentGroup = filteredSchedules[scheduleIndex]
   const currentSchedule = currentGroup?.schedule
-  const activeDescriptions = describeActiveFilters(filters, DAY_NAMES, minutesToTime)
+  const activeDescriptions = describeActiveFilters(filters, DAY_NAMES, minutesToTime, filterDays)
   const courseTitles = useMemo(() => new Map(selectedCourses.map((course) => [`${course.subject}:${course.number}`, course.title])), [selectedCourses])
   const courseStyles = useMemo(() => getCourseStyleMap(selectedCourses.map((course) => `${course.subject}:${course.number}`)), [selectedCourses])
   const changeFilters = (nextFilters: ScheduleFilters) => {
@@ -181,7 +190,7 @@ export function ScheduleResults({ generation, selectedCourses }: { generation: G
     setComparisonIndices([])
     setViewMode('gallery')
   }
-  const resetFilters = () => changeFilters(DEFAULT_FILTERS)
+  const resetFilters = () => changeFilters(defaultFilters)
   const toggleComparison = (index: number) => setComparisonIndices((values) => values.includes(index) ? values.filter((value) => value !== index) : values.length < 6 ? [...values, index] : values)
   const toggleGapOrder = () => {
     const selectedGroups = comparisonIndices.flatMap((index) => filteredSchedules[index] ? [filteredSchedules[index]] : [])
@@ -212,7 +221,7 @@ export function ScheduleResults({ generation, selectedCourses }: { generation: G
 
   return (
     <section className="panel results" aria-labelledby="results-heading">
-      <FilterPanel filters={filters} onChange={changeFilters} onReset={resetFilters} />
+      <FilterPanel filters={filters} filterDays={filterDays} onChange={changeFilters} onReset={resetFilters} />
       <div className="match-summary" aria-live="polite"><strong>{filteredSchedules.length} of {consolidatedSchedules.length} generated schedules match your filters</strong>{generation.schedules.length > consolidatedSchedules.length && <span>{generation.schedules.length} section combinations were consolidated into {consolidatedSchedules.length} distinct timetable {consolidatedSchedules.length === 1 ? 'option' : 'options'}.</span>}{generation.truncated && <span>The exploration guard was reached.</span>}</div>
       {generation.truncated && <p className="notice">Generation reached the 100,000-step exploration guard. The combination count and schedules shown may be incomplete.</p>}
       {!currentSchedule ? (

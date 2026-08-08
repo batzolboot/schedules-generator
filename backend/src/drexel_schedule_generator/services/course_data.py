@@ -108,6 +108,12 @@ def search_courses(
                 schedulable_section_count=len(active),
                 component_types=components,
                 delivery_modes=delivery_modes,
+                has_saturday_sections=any(
+                    day.day_of_week == 6
+                    for section in active
+                    for meeting in section.meeting_times
+                    for day in meeting.days
+                ),
             )
         )
     return CoursePageResponse(items=items, page=page, page_size=page_size, total=total)

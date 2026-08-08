@@ -6,7 +6,7 @@ import type { Course, GenerateResponse, Schedule } from './api'
 import { ScheduleResults } from './ScheduleResults'
 import { meeting, schedule, section } from './scheduling/testFixtures'
 
-const selectedCourses: Course[] = [{ id: 10, subject: 'CS', number: '380', title: 'Artificial Intelligence', minimum_credits: '3.00', maximum_credits: '3.00', schedulable_section_count: 5, component_types: ['lecture', 'lab', 'recitation'], delivery_modes: ['face_to_face'] }]
+const selectedCourses: Course[] = [{ id: 10, subject: 'CS', number: '380', title: 'Artificial Intelligence', minimum_credits: '3.00', maximum_credits: '3.00', schedulable_section_count: 5, component_types: ['lecture', 'lab', 'recitation'], delivery_modes: ['face_to_face'], has_saturday_sections: true }]
 
 function withMetrics(sections: Schedule['sections']): Schedule {
   const recurring = sections.flatMap((item) => item.meetings).filter((item) => item.meeting_type !== 'final_exam')
@@ -77,6 +77,18 @@ describe('ScheduleResults', () => {
     expect(screen.queryByRole('button', { name: 'Select Monday–Saturday' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Weekdays only' })).not.toBeInTheDocument()
+  })
+
+  it('hides Saturday and excludes Saturday schedules when selected courses have no Saturday sections', () => {
+    const weekdayCourses = selectedCourses.map((course) => ({ ...course, has_saturday_sections: false }))
+    render(<ScheduleResults generation={generation} selectedCourses={weekdayCourses} />)
+
+    for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']) {
+      expect(screen.getByRole('checkbox', { name: day })).toBeChecked()
+    }
+    expect(screen.queryByRole('checkbox', { name: 'Saturday' })).not.toBeInTheDocument()
+    expect(screen.getByText('2 of 3 generated schedules match your filters')).toBeInTheDocument()
+    expect(screen.getByText(/Monday–Friday/)).toBeInTheDocument()
   })
 
   it('defaults to 7:15 AM–10:30 PM and applies inclusive slider boundaries', () => {
