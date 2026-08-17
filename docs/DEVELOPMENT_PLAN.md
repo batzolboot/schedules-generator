@@ -1,5 +1,7 @@
 # Drexel Schedule Generator — Development Plan
 
+> **Document status:** This is the original phased plan and is retained as project-history documentation. The local acceptance gate was completed and the application was subsequently deployed. See the root `README.md` for the current implementation and production architecture.
+
 ## 1. Delivery principles
 
 - Build a narrow anonymous planning workflow before expanding features.
@@ -259,27 +261,26 @@ Deployment work may begin only after the user approves a demonstration showing:
 8. Accurate freshness and limitation messaging
 9. Passing automated checks
 
-## 8. Phase 6 — Deployment, deferred until approved
+## 8. Phase 6 — Deployment
 
 ### Goal
 
 Deploy the already-working application without changing its core architecture.
 
-This phase must not start until the Phase 5 local acceptance gate is approved.
+This phase began after the local acceptance gate was approved.
 
-Anticipated work, subject to a separate deployment plan and approval:
+The deployed application currently uses Cloudflare, Google Cloud Run, and Neon PostgreSQL. The following operational improvements remain relevant:
 
-- Select static frontend hosting.
-- Provision managed PostgreSQL.
-- Deploy FastAPI to Google Cloud Run.
-- Package the importer as a separate Cloud Run Job.
+- Keep frontend and backend deployments reproducible.
+- Protect and rotate production database credentials.
+- Keep the importer separate from the API service.
 - Configure secrets, database connectivity, and migration execution.
 - Add deployment environments and rollback procedures.
 - Extend GitHub Actions from CI to approved CD workflows.
 - Add production health checks, logs, and basic monitoring.
 - Perform a controlled first data update and smoke test.
 
-No cloud resources or deployment configuration are included in Phases 1–5.
+The root README describes the as-built deployment; this plan continues to document the original sequencing and scope controls.
 
 ## 9. Features postponed beyond the MVP
 
@@ -333,4 +334,3 @@ Before adding work to an active phase, ask:
 - Has any necessary product decision been approved?
 
 If it is not required for the current exit criteria, place it in a later phase or the postponed-features list.
-

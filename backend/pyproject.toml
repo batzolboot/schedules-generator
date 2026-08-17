@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name = "drexel-schedule-generator"
 version = "0.1.0"
 description = "Backend for the Drexel Schedule Generator"
-readme = "../README.md"
 requires-python = ">=3.12"
 dependencies = [
     "alembic==1.18.5",

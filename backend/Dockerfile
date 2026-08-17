@@ -7,13 +7,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# pyproject.toml references ../README.md. The repository README is outside the
-# backend-only build context, so provide build metadata at the expected path.
 COPY pyproject.toml ./
 COPY src ./src
-RUN printf '%s\n' '# Drexel Schedule Generator backend' > /README.md \
-    && python -m pip install . \
-    && rm /README.md
+RUN python -m pip install .
 
 # Keep migrations available for one-off `alembic upgrade head` invocations.
 COPY alembic.ini ./

@@ -55,7 +55,7 @@ describe('App', () => {
     const user = userEvent.setup()
     render(<App />)
     await selectAndSearch(user)
-    expect(api.courses).toHaveBeenCalledWith(1, 'CS 172')
+    expect(api.courses).toHaveBeenCalledWith(1, 'CS 172', expect.any(AbortSignal))
     expect(screen.getByText('lecture')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('Try CS 172 or Computer Programming II')).toBeInTheDocument()
   })
@@ -120,7 +120,7 @@ describe('App', () => {
     await user.click(online)
     await user.click(screen.getByRole('button', { name: 'Generate schedules' }))
 
-    expect(api.generate).toHaveBeenCalledWith(1, [10], { 10: ['face_to_face'] })
+    expect(api.generate).toHaveBeenCalledWith(1, [10], { 10: ['face_to_face'] }, expect.any(AbortSignal))
   })
 
   it('keeps delivery preferences independent for two courses', async () => {
@@ -160,6 +160,61 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: 'Add course' }))
     await user.click(screen.getByRole('button', { name: 'Generate schedules' }))
     expect(await screen.findByText('Every combination overlaps.')).toBeInTheDocument()
+  })
+
+  it('clears generated schedules when the cart changes', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+    await selectAndSearch(user)
+    await user.click(screen.getByRole('button', { name: 'Add course' }))
+    await user.click(screen.getByRole('button', { name: 'Generate schedules' }))
+    expect(await screen.findByRole('heading', { name: 'Compare your options' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Remove CS 172' }))
+
+    expect(screen.queryByRole('heading', { name: 'Compare your options' })).not.toBeInTheDocument()
+    expect(screen.getByText('No courses selected yet.')).toBeInTheDocument()
+  })
+
+  it('ignores a generation response that finishes after the cart changes', async () => {
+    let resolveGeneration!: (value: Awaited<ReturnType<typeof api.generate>>) => void
+    const pendingGeneration = new Promise<Awaited<ReturnType<typeof api.generate>>>((resolve) => {
+      resolveGeneration = resolve
+    })
+    vi.mocked(api.generate).mockReturnValue(pendingGeneration)
+    const user = userEvent.setup()
+    render(<App />)
+    await selectAndSearch(user)
+    await user.click(screen.getByRole('button', { name: 'Add course' }))
+    await user.click(screen.getByRole('button', { name: 'Generate schedules' }))
+    await user.click(screen.getByRole('button', { name: 'Remove CS 172' }))
+
+    resolveGeneration({ schedules: [{ sections: [section(1, 'lecture', 1)], metrics: { campus_days: 1, total_gap_minutes: 0, earliest_start: '09:00:00', latest_end: '10:00:00', total_meeting_minutes: 60 } }], total_valid_considered: 1, truncated: false, no_results: null, compatibility_limitation: null })
+
+    expect(await screen.findByText('No courses selected yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Compare your options' })).not.toBeInTheDocument()
+  })
+
+  it('enforces the eight-course selection limit before generation', async () => {
+    const courses = Array.from({ length: 9 }, (_, index): Course => ({
+      ...course,
+      id: index + 1,
+      number: String(171 + index),
+      title: `Course ${index + 1}`,
+    }))
+    vi.mocked(api.courses).mockResolvedValue({ items: courses, total: courses.length })
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText(/Last updated on Aug 2, 2026/)
+    await user.type(screen.getByLabelText('Search by subject, number, or title'), 'CS 172')
+    await screen.findByText('Course 1')
+
+    for (let index = 0; index < 8; index += 1) {
+      await user.click(screen.getAllByRole('button', { name: 'Add course' })[0])
+    }
+
+    expect(screen.getByRole('button', { name: '8-course maximum' })).toBeDisabled()
+    expect(screen.getAllByRole('button', { name: /^Remove CS/ })).toHaveLength(8)
   })
 
   it('shows an API error state', async () => {

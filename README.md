@@ -114,10 +114,8 @@ Open <http://127.0.0.1:5174>. API documentation is available at <http://127.0.0.
 
 ## Configuration
 
-Copy the safe examples to local `.env` files if desired:
-
-- `backend/.env.example` defines `APP_ENV` and `DATABASE_URL`
-- `frontend/.env.example` defines `VITE_API_BASE_URL`
+- `backend/.env.example` documents `APP_ENV` and `DATABASE_URL`. The backend reads shell environment variables directly; it does not automatically load a `.env` file.
+- `frontend/.env.example` documents `VITE_API_BASE_URL`. Vite supports a local `frontend/.env` file during frontend development.
 
 Real `.env` files, browser storage state, cookies, tokens, and credentials are ignored by Git. Production credentials should be stored in the hosting provider's secret manager, never in this repository.
 
@@ -131,6 +129,7 @@ backend\.venv\Scripts\python.exe -m pytest backend\tests
 backend\.venv\Scripts\python.exe -m pip check
 
 npm --prefix frontend test -- --run
+npm --prefix frontend audit --audit-level=moderate
 npm --prefix frontend run lint
 npm --prefix frontend run build
 

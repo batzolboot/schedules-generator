@@ -27,7 +27,7 @@ Run from `backend`:
 - `records.py`: immutable source records with no SQLAlchemy dependency.
 - `parser.py`: network-independent sanitization and parsing; every table row is returned.
 - `commands.py`: maintainer entry points.
-- `importer.py`: intentionally absent until the database-write phase.
+- `importer.py`: transactional database publication and inactive-section handling, separate from browser navigation and parsing.
 
 ## Investigation status
 

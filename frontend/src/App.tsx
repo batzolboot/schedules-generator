@@ -1,7 +1,13 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { api, type Course, type Freshness, type GenerateResponse, type Term } from './api'
 import { ScheduleResults } from './ScheduleResults'
+
+const MAX_SELECTED_COURSES = 8
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError'
+}
 
 function formatFreshness(freshness: Freshness | null, term: Term | undefined): string {
   const updatedAt = term?.latest_successful_import_at ?? freshness?.latest_successful_import_at
@@ -46,6 +52,7 @@ export function App() {
   const [initialError, setInitialError] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [courses, setCourses] = useState<Course[]>([])
+  const [courseTotal, setCourseTotal] = useState(0)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Course[]>([])
@@ -53,6 +60,7 @@ export function App() {
   const [generation, setGeneration] = useState<GenerateResponse | null>(null)
   const [generationError, setGenerationError] = useState<string | null>(null)
   const [deliveryPreferences, setDeliveryPreferences] = useState<Record<number, Array<'online' | 'face_to_face'>>>({})
+  const generationAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     Promise.all([api.freshness(), api.terms()])
@@ -66,17 +74,35 @@ export function App() {
 
   useEffect(() => {
     setCourses([])
+    setCourseTotal(0)
     setSearchError(null)
+    setSearching(false)
     if (!termId || !query.trim()) return
+    const controller = new AbortController()
     setSearching(true)
     const timeout = window.setTimeout(() => {
-      api.courses(termId, query.trim())
-        .then((response) => setCourses(response.items))
-        .catch((error: unknown) => setSearchError(error instanceof Error ? error.message : 'Course search failed.'))
-        .finally(() => setSearching(false))
+      api.courses(termId, query.trim(), controller.signal)
+        .then((response) => {
+          if (controller.signal.aborted) return
+          setCourses(response.items)
+          setCourseTotal(response.total)
+        })
+        .catch((error: unknown) => {
+          if (!isAbortError(error) && !controller.signal.aborted) {
+            setSearchError(error instanceof Error ? error.message : 'Course search failed.')
+          }
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setSearching(false)
+        })
     }, 300)
-    return () => window.clearTimeout(timeout)
+    return () => {
+      window.clearTimeout(timeout)
+      controller.abort()
+    }
   }, [query, termId])
+
+  useEffect(() => () => generationAbortRef.current?.abort(), [])
 
   const selectedTerm = terms.find((term) => term.id === termId)
   const selectedIds = useMemo(() => new Set(selected.map((course) => course.id)), [selected])
@@ -91,29 +117,58 @@ export function App() {
     window.localStorage.setItem('schedule-generator-theme', theme)
   }, [theme])
 
+  function invalidateGeneration() {
+    generationAbortRef.current?.abort()
+    generationAbortRef.current = null
+    setGenerating(false)
+    setGeneration(null)
+    setGenerationError(null)
+  }
+
   async function generate() {
     if (!termId || selected.length === 0) return
+    generationAbortRef.current?.abort()
+    const controller = new AbortController()
+    generationAbortRef.current = controller
     setGenerating(true)
     setGenerationError(null)
     setGeneration(null)
     try {
-      const response = await api.generate(termId, selected.map((course) => course.id), deliveryPreferences)
-      setGeneration(response)
+      const response = await api.generate(termId, selected.map((course) => course.id), deliveryPreferences, controller.signal)
+      if (generationAbortRef.current === controller) setGeneration(response)
     } catch (error) {
-      setGenerationError(error instanceof Error ? error.message : 'Schedule generation failed.')
+      if (!isAbortError(error) && generationAbortRef.current === controller) {
+        setGenerationError(error instanceof Error ? error.message : 'Schedule generation failed.')
+      }
     } finally {
-      setGenerating(false)
+      if (generationAbortRef.current === controller) {
+        generationAbortRef.current = null
+        setGenerating(false)
+      }
     }
   }
 
   function addCourse(course: Course) {
+    if (selected.length >= MAX_SELECTED_COURSES || selectedIds.has(course.id)) return
+    invalidateGeneration()
     setSelected((items) => [...items, course])
     if (course.delivery_modes?.includes('online') && course.delivery_modes.includes('face_to_face')) {
       setDeliveryPreferences((current) => ({ ...current, [course.id]: ['face_to_face', 'online'] }))
     }
   }
 
+  function removeCourse(courseId: number) {
+    invalidateGeneration()
+    setSelected((items) => items.filter((item) => item.id !== courseId))
+    setDeliveryPreferences((current) => {
+      const next = { ...current }
+      delete next[courseId]
+      return next
+    })
+  }
+
   function toggleDeliveryMode(courseId: number, mode: 'online' | 'face_to_face') {
+    invalidateGeneration()
     setDeliveryPreferences((current) => {
       const existing = current[courseId] ?? ['face_to_face', 'online']
       const next = existing.includes(mode) ? existing.filter((item) => item !== mode) : [...existing, mode]
@@ -143,16 +198,21 @@ export function App() {
         {searching && <p role="status">Searching courses…</p>}
         {searchError && <p className="error" role="alert">Course search failed: {searchError}</p>}
         {!searching && termId && query.trim() && courses.length === 0 && !searchError && <p>No matching schedulable undergraduate courses.</p>}
+        {!searching && courseTotal > courses.length && <p>Showing the first {courses.length} of {courseTotal} matches. Refine your search to see a specific course.</p>}
         <div className="course-grid">
-          {courses.map((course) => (
+          {courses.map((course) => {
+            const alreadySelected = selectedIds.has(course.id)
+            const selectionLimitReached = selected.length >= MAX_SELECTED_COURSES && !alreadySelected
+            return (
             <article className="course-card" key={course.id}>
               <div><strong>{course.subject} {course.number}</strong><h3>{course.title}</h3></div>
               {credits(course) && <p>{credits(course)}</p>}
               <p>{course.schedulable_section_count} schedulable sections</p>
               <div className="badges">{course.component_types.map((component) => <span key={component}>{component}</span>)}</div>
-              <button disabled={selectedIds.has(course.id)} onClick={() => addCourse(course)}>{selectedIds.has(course.id) ? 'Added' : 'Add course'}</button>
+              <button disabled={alreadySelected || selectionLimitReached} onClick={() => addCourse(course)}>{alreadySelected ? 'Added' : selectionLimitReached ? '8-course maximum' : 'Add course'}</button>
             </article>
-          ))}
+            )
+          })}
         </div>
       </section>
 
@@ -161,7 +221,7 @@ export function App() {
       <section className="panel selection-cart" aria-labelledby="selected-heading">
         <h2 id="selected-heading">2. Selected courses</h2>
         {selected.length === 0 ? <p>No courses selected yet.</p> : (
-          <ul className="selected-list">{selected.map((course) => { const modes = course.delivery_modes ?? []; const allowed = deliveryPreferences[course.id] ?? ['face_to_face', 'online']; const courseLabel = `${course.subject} ${course.number}`; const hasBothModes = modes.includes('online') && modes.includes('face_to_face'); return <li key={course.id}><div><span>{courseLabel} — {course.title}</span><div className="cart-course-meta">{hasBothModes ? <fieldset className="delivery-preference" aria-label={`${courseLabel} delivery options`}>{([['face_to_face', 'In person'], ['online', 'Online']] as const).map(([mode, label]) => <label key={mode}><input type="checkbox" aria-label={`${courseLabel} ${label}`} checked={allowed.includes(mode)} onChange={() => toggleDeliveryMode(course.id, mode)} />{label}</label>)}</fieldset> : modes.length === 1 ? <span className="single-delivery-mode">{modes[0] === 'online' ? 'Online' : 'In person'}</span> : null}<span className="cart-course-credits">{compactCredits(course)}</span></div></div><button onClick={() => { setSelected((items) => items.filter((item) => item.id !== course.id)); setDeliveryPreferences((current) => { const next = { ...current }; delete next[course.id]; return next }) }}>Remove {courseLabel}</button></li> })}</ul>
+          <ul className="selected-list">{selected.map((course) => { const modes = course.delivery_modes ?? []; const allowed = deliveryPreferences[course.id] ?? ['face_to_face', 'online']; const courseLabel = `${course.subject} ${course.number}`; const hasBothModes = modes.includes('online') && modes.includes('face_to_face'); return <li key={course.id}><div><span>{courseLabel} — {course.title}</span><div className="cart-course-meta">{hasBothModes ? <fieldset className="delivery-preference" aria-label={`${courseLabel} delivery options`}>{([['face_to_face', 'In person'], ['online', 'Online']] as const).map(([mode, label]) => <label key={mode}><input type="checkbox" aria-label={`${courseLabel} ${label}`} checked={allowed.includes(mode)} onChange={() => toggleDeliveryMode(course.id, mode)} />{label}</label>)}</fieldset> : modes.length === 1 ? <span className="single-delivery-mode">{modes[0] === 'online' ? 'Online' : 'In person'}</span> : null}<span className="cart-course-credits">{compactCredits(course)}</span></div></div><button onClick={() => removeCourse(course.id)}>Remove {courseLabel}</button></li> })}</ul>
         )}
         {selected.length > 0 && <p className="cart-credit-total"><span>Total credits</span><strong>{selectedCreditTotal.minimum === selectedCreditTotal.maximum ? compactCreditValue(String(selectedCreditTotal.minimum)) : `${compactCreditValue(String(selectedCreditTotal.minimum))}–${compactCreditValue(String(selectedCreditTotal.maximum))}`}</strong></p>}
         <button className="primary" disabled={!termId || selected.length === 0 || generating} onClick={generate}>{generating ? 'Generating…' : 'Generate schedules'}</button>

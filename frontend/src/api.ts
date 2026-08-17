@@ -111,14 +111,16 @@ export function formatErrorDetail(detail: unknown): string | null {
 export const api = {
   freshness: () => request<Freshness>('/api/v1/data-freshness'),
   terms: () => request<Term[]>('/api/v1/terms'),
-  courses: (termId: number, search: string) =>
+  courses: (termId: number, search: string, signal?: AbortSignal) =>
     request<{ items: Course[]; total: number }>(
-      `/api/v1/terms/${termId}/courses?search=${encodeURIComponent(search)}`,
+      `/api/v1/terms/${termId}/courses?search=${encodeURIComponent(search)}&page_size=100`,
+      { signal },
     ),
-  generate: (termId: number, courseIds: number[], deliveryPreferences: Record<number, Array<'online' | 'face_to_face'>>) =>
+  generate: (termId: number, courseIds: number[], deliveryPreferences: Record<number, Array<'online' | 'face_to_face'>>, signal?: AbortSignal) =>
     request<GenerateResponse>('/api/v1/schedules/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal,
       body: JSON.stringify({
         term_id: termId,
         course_ids: courseIds,

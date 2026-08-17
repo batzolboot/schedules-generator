@@ -1,8 +1,10 @@
 # Drexel Schedule Generator — Architecture
 
+> **Document status:** This records the architecture approved before implementation. The application has since passed its local acceptance gate and is deployed with Cloudflare for the frontend, Google Cloud Run for the API, and Neon PostgreSQL. See the root `README.md` for the current as-built and operational overview.
+
 ## 1. Architectural approach
 
-The application will begin as a modular monolith in a monorepo. The browser frontend, backend API, importer process, and PostgreSQL database have clear boundaries, but the backend and importer share one Python codebase.
+The application is a modular monolith in a monorepo. The browser frontend, backend API, importer process, and PostgreSQL database have clear boundaries, while the backend and importer share one Python codebase.
 
 This shape is intentionally simple for a single developer:
 
@@ -11,7 +13,7 @@ This shape is intentionally simple for a single developer:
 - One PostgreSQL database
 - One separately invoked importer entry point
 - No account service, queue, cache, or search cluster
-- No deployment work until the local product works end to end
+- Deployment followed successful local end-to-end verification
 
 ## 2. Technology choices
 
@@ -24,8 +26,8 @@ This shape is intentionally simple for a single developer:
 | Backend tests | Pytest | Domain, API, persistence, and importer tests |
 | Frontend tests | Vitest, React Testing Library | Component behavior and user workflows |
 | Local runtime | Docker Compose | Reproducible database and application services |
-| Future deployment | Cloud Run and Cloud Run Jobs | API service and independent updater, after local completion |
-| Future automation | GitHub Actions | CI first; deployment automation only after local completion |
+| Production | Cloudflare, Google Cloud Run, Neon | Static frontend, API service, and managed PostgreSQL |
+| Automation | GitHub Actions | Tests, migrations, frontend build, and container verification |
 
 ## 3. System context
 
@@ -87,13 +89,13 @@ Initial API capabilities are expected to include:
 - Schedule generation
 - ICS export
 
-Exact routes and schemas will be designed alongside their implementation rather than fixed prematurely in this document.
+The implemented routes are summarized in the root `README.md`; FastAPI exposes the current OpenAPI schema at `/docs`.
 
 ### 4.3 PostgreSQL
 
 PostgreSQL is the system of record for imported course data. Generated schedules are derived from requests and are not persisted in the MVP.
 
-Initial entities are:
+Current entities are:
 
 | Entity | Purpose |
 | --- | --- |
@@ -101,13 +103,15 @@ Initial entities are:
 | `subjects` | Subject code and name |
 | `courses` | Catalog identity such as CS 171 |
 | `course_offerings` | A course offered in a particular term |
+| `component_types` | Normalized lecture, lab, recitation, and other component names |
+| `offering_components` | Component requirements for a term-specific course offering |
 | `sections` | Registerable section/component records |
-| `section_relationships` | Known compatible or required links among components |
-| `meeting_patterns` | Time, date range, delivery, and location for a section meeting |
-| `meeting_days` | Normalized weekdays associated with a meeting pattern |
+| `section_relationship_rules` and `section_relationship_options` | Known compatible or required links among components |
+| `meeting_times` | Time, date range, and delivery details for a section meeting |
+| `meeting_days` | Normalized weekdays associated with a meeting time |
 | `instructors` | Instructor identity from the source, when available |
 | `section_instructors` | Section-to-instructor association |
-| `data_imports` | Import status, source metadata, counts, timestamps, and errors |
+| `import_runs` | Import status, source metadata, counts, timestamps, and errors |
 
 Important modeling principles:
 
@@ -118,7 +122,7 @@ Important modeling principles:
 - Model known component relationships; do not infer universal lecture/lab compatibility without evidence.
 - Make publication of a new term dataset atomic.
 
-The final columns and constraints depend on representative source fixtures and will be captured in Alembic migrations when implementation begins.
+The implemented columns and constraints are defined by the SQLAlchemy models and versioned Alembic migrations.
 
 ### 4.4 Importer process
 
@@ -238,17 +242,17 @@ Tests should emphasize behavior and domain correctness over implementation detai
 - Fixture files must contain only data the project is allowed to store in the repository.
 - The project should retain a small synthetic fixture option so demonstrations do not depend on source availability.
 
-## 10. Future deployment boundary
+## 10. Deployment boundary
 
-Deployment is intentionally deferred. After the application works locally, the anticipated production shape is:
+Deployment was deferred until the application worked locally. The resulting production shape is:
 
-- Static hosting for the Vite frontend
+- Cloudflare hosting for the Vite frontend
 - FastAPI as a Google Cloud Run service
-- PostgreSQL in a managed service such as Cloud SQL
-- Importer as a separate Cloud Run Job
-- GitHub Actions for CI/CD
+- PostgreSQL on Neon
+- Importer invoked separately from the API service
+- GitHub Actions for continuous integration
 
-These are future boundaries, not authorization to create cloud configuration now. Local correctness and usability are prerequisites for all deployment work.
+The API remains stateless, generated schedules are not persisted, and importer work does not run inside the API service.
 
 ## 11. Key architecture risks
 
@@ -271,4 +275,3 @@ The following decisions should be made when their implementation phase begins:
 3. Which weekly-calendar library to use, if any, after evaluating accessibility and bundle cost.
 4. Whether end-to-end browser tests are added and which runner is used.
 5. The maximum selected-course count, search-space limit, and returned-result count, based on fixture benchmarks.
-

@@ -233,26 +233,26 @@ describe('ScheduleResults', () => {
     const timetable = screen.getByLabelText('Weekly timetable')
     expect(within(timetable).getByText('Saturday')).toBeInTheDocument()
     expect(within(timetable).queryByText('Sunday')).not.toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Sun' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sun' })).not.toBeInTheDocument()
   })
 
   it('preserves selected comparisons when gap order changes', async () => {
     const user = userEvent.setup()
     render(<ScheduleResults generation={generation} selectedCourses={selectedCourses} />)
-    const compare = screen.getAllByRole('checkbox', { name: 'Compare' })
+    const compare = screen.getAllByRole('checkbox', { name: /Compare schedule/ })
     await user.click(compare[0])
     await user.click(compare[1])
 
     await user.click(screen.getByRole('button', { name: 'Gap time: lowest to highest' }))
 
     expect(screen.getByRole('button', { name: 'Compare selected (2)' })).toBeEnabled()
-    expect(screen.getAllByRole('checkbox', { name: 'Compare' }).filter((checkbox) => (checkbox as HTMLInputElement).checked)).toHaveLength(2)
+    expect(screen.getAllByRole('checkbox', { name: /Compare schedule/ }).filter((checkbox) => (checkbox as HTMLInputElement).checked)).toHaveLength(2)
   })
 
   it('clears selected gallery comparisons on request', async () => {
     const user = userEvent.setup()
     render(<ScheduleResults generation={generation} selectedCourses={selectedCourses} />)
-    await user.click(screen.getAllByRole('checkbox', { name: 'Compare' })[0])
+    await user.click(screen.getAllByRole('checkbox', { name: /Compare schedule/ })[0])
     expect(screen.getByRole('button', { name: 'Clear selected' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Clear selected' }))
@@ -265,7 +265,7 @@ describe('ScheduleResults', () => {
     const user = userEvent.setup()
     const manySchedules = Array.from({ length: 7 }, (_, index) => schedule(index + 20, [meeting((index % 6) + 1, `${String(8 + index).padStart(2, '0')}:00:00`, `${String(9 + index).padStart(2, '0')}:00:00`)]))
     render(<ScheduleResults generation={{ ...generation, schedules: manySchedules, total_valid_considered: 7 }} selectedCourses={selectedCourses} />)
-    const compare = screen.getAllByRole('checkbox', { name: 'Compare' })
+    const compare = screen.getAllByRole('checkbox', { name: /Compare schedule/ })
     for (let index = 0; index < 6; index += 1) await user.click(compare[index])
     expect(compare[6]).toBeDisabled()
     await user.click(screen.getByRole('button', { name: 'Compare selected (6)' }))
@@ -277,8 +277,8 @@ describe('ScheduleResults', () => {
     const user = userEvent.setup()
     render(<ScheduleResults generation={{ ...generation, schedules: [tuesday], truncated: true }} selectedCourses={selectedCourses} />)
     await openFirstSchedule(user)
-    expect(screen.getByRole('tablist', { name: 'Schedule day' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Tue' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Schedule day' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Tue' })).toHaveAttribute('aria-pressed')
     expect(screen.getByText(/100,000-step exploration guard/)).toBeInTheDocument()
   })
 

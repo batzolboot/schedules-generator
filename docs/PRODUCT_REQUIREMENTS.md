@@ -1,5 +1,7 @@
 # Drexel Schedule Generator — Product Requirements
 
+> **Document status:** This captures the approved MVP requirements before implementation. The local acceptance gate was completed and the application was subsequently deployed; see the root `README.md` for current capabilities and known limitations.
+
 ## 1. Purpose
 
 The Drexel Schedule Generator is a portfolio-quality web application that helps Drexel students explore course-section combinations and produce conflict-free weekly schedules. It is a planning aid, not an official registration system. Drexel's official registration information remains authoritative.
@@ -190,4 +192,3 @@ The following decisions still require approval before their associated feature i
 2. Whether arranged meetings should be omitted from ICS export with a warning or exported as untimed informational entries.
 3. Which predefined alternate ranking choices should accompany the default of fewer campus days followed by shorter gaps.
 4. Whether anonymous planner state should use browser local storage, a shareable URL, or both.
-
