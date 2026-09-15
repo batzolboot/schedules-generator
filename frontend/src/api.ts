@@ -76,6 +76,20 @@ export interface Freshness {
   term_updates: Record<string, string>
 }
 
+export type FeedbackType = 'Bug Report' | 'Feature Suggestion' | 'Usability Feedback' | 'Other'
+
+export interface FeedbackRequest {
+  name: string
+  email: string
+  type: FeedbackType[]
+  message: string
+}
+
+export interface FeedbackResponse {
+  success: boolean
+  message: string
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
   if (!response.ok) {
@@ -126,5 +140,11 @@ export const api = {
         course_ids: courseIds,
         delivery_preferences: deliveryPreferences,
       }),
+    }),
+  feedback: (payload: FeedbackRequest) =>
+    request<FeedbackResponse>('/api/v1/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     }),
 }

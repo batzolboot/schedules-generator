@@ -28,11 +28,34 @@ flowchart LR
     Browser["Student browser"] --> Frontend["React + TypeScript\nCloudflare"]
     Frontend -->|"HTTPS / JSON"| API["FastAPI\nGoogle Cloud Run"]
     API --> Database[("PostgreSQL\nNeon")]
+    API -->|"Validated feedback JSON"| Make["Make.com webhook"]
     Maintainer["Authorized maintainer"] -->|"Interactive login + MFA"| Importer["WebTMS importer"]
     Importer --> Database
 ```
 
 The backend is a modular monolith. FastAPI routes handle transport concerns, service modules coordinate application workflows, and the scheduling engine remains independent of FastAPI and SQLAlchemy. The authenticated WebTMS importer is a separate maintainer command and never runs as a permanent API background process.
+
+### Feedback flow
+
+```text
+User submits feedback
+        ↓
+Frontend sends POST /api/v1/feedback
+        ↓
+Backend validates request
+        ↓
+Backend securely forwards JSON to Make.com
+        ↓
+Make.com creates feedback ID
+        ↓
+Make.com adds row to Google Sheets
+        ↓
+If Type contains Bug Report
+        ↓
+Make.com sends email notification
+```
+
+The browser communicates only with the FastAPI endpoint. `MAKE_FEEDBACK_WEBHOOK_URL` is a backend-only secret and is never included in the frontend build, browser requests, or source code.
 
 ## Technology
 
@@ -114,7 +137,7 @@ Open <http://127.0.0.1:5174>. API documentation is available at <http://127.0.0.
 
 ## Configuration
 
-- `backend/.env.example` documents `APP_ENV` and `DATABASE_URL`. The backend reads shell environment variables directly; it does not automatically load a `.env` file.
+- `backend/.env.example` documents `APP_ENV`, `DATABASE_URL`, and `MAKE_FEEDBACK_WEBHOOK_URL`. The backend reads shell environment variables directly; it does not automatically load a `.env` file. Set `MAKE_FEEDBACK_WEBHOOK_URL` in the shell or backend deployment secret manager; do not put it in `frontend/.env` or Cloudflare frontend variables.
 - `frontend/.env.example` documents `VITE_API_BASE_URL`. Vite supports a local `frontend/.env` file during frontend development.
 
 Real `.env` files, browser storage state, cookies, tokens, and credentials are ignored by Git. Production credentials should be stored in the hosting provider's secret manager, never in this repository.
@@ -150,6 +173,7 @@ GitHub Actions runs the same critical backend, frontend, migration, and containe
 | `GET` | `/api/v1/terms/{term_id}/courses/{course_id}/sections` | Course sections and meetings |
 | `GET` | `/api/v1/data-freshness` | Last successful imports |
 | `POST` | `/api/v1/schedules/generate` | Conflict-free schedule generation |
+| `POST` | `/api/v1/feedback` | Validate and securely forward feedback to Make.com |
 
 Interactive OpenAPI documentation is exposed at `/docs` by FastAPI.
 

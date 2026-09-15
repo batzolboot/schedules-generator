@@ -11,6 +11,7 @@ vi.mock('./api', () => ({
     terms: vi.fn(),
     courses: vi.fn(),
     generate: vi.fn(),
+    feedback: vi.fn(),
   },
 }))
 

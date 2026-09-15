@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { api, type Course, type Freshness, type GenerateResponse, type Term } from './api'
+import { FeedbackForm } from './FeedbackForm'
 import { ScheduleResults } from './ScheduleResults'
 
 const MAX_SELECTED_COURSES = 8
@@ -42,6 +43,7 @@ function compactCredits(course: Course): string | null {
 }
 
 export function App() {
+  const [view, setView] = useState<'planner' | 'feedback'>(() => window.location.hash === '#feedback' ? 'feedback' : 'planner')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = window.localStorage.getItem('schedule-generator-theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -117,6 +119,17 @@ export function App() {
     window.localStorage.setItem('schedule-generator-theme', theme)
   }, [theme])
 
+  useEffect(() => {
+    const updateView = () => setView(window.location.hash === '#feedback' ? 'feedback' : 'planner')
+    window.addEventListener('hashchange', updateView)
+    return () => window.removeEventListener('hashchange', updateView)
+  }, [])
+
+  function showView(nextView: 'planner' | 'feedback') {
+    window.location.hash = nextView === 'feedback' ? 'feedback' : ''
+    setView(nextView)
+  }
+
   function invalidateGeneration() {
     generationAbortRef.current?.abort()
     generationAbortRef.current = null
@@ -185,9 +198,15 @@ export function App() {
         </div>
         <h1>Drexel Schedule Generator</h1>
         <p>Choose undergraduate courses from one term and compare conflict-free lecture and lab combinations.</p>
+        <nav className="site-nav" aria-label="Main navigation">
+          <a href="#" aria-current={view === 'planner' ? 'page' : undefined} onClick={() => showView('planner')}>Schedule generator</a>
+          <a href="#feedback" aria-current={view === 'feedback' ? 'page' : undefined} onClick={() => showView('feedback')}>Feedback</a>
+        </nav>
         <p className="freshness" role="status">{initialError ? `Course-data status unavailable: ${initialError}` : formatFreshness(freshness, selectedTerm)}</p>
         <p className="disclaimer">Planning aid only. Drexel’s official registration system remains authoritative.</p>
       </header>
+
+      {view === 'feedback' ? <FeedbackForm /> : <>
 
       <div className="planner-layout">
         <div className="planner-main">
@@ -231,6 +250,7 @@ export function App() {
       </div>
 
       {generation && generation.schedules.length > 0 && <ScheduleResults generation={generation} selectedCourses={selected} />}
+      </>}
     </main>
   )
 }

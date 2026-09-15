@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from drexel_schedule_generator.api.routes.course_data import router as course_data_router
+from drexel_schedule_generator.api.routes.feedback import router as feedback_router
 from drexel_schedule_generator.api.routes.health import router as health_router
 from drexel_schedule_generator.api.routes.scheduling import router as scheduling_router
 
@@ -20,4 +21,5 @@ app.add_middleware(
 )
 app.include_router(health_router)
 app.include_router(course_data_router)
+app.include_router(feedback_router)
 app.include_router(scheduling_router)
